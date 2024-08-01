@@ -2,6 +2,7 @@
 name = "vite"
 version = "0.1.0"
 edition = "2021"
+authors = ["Wesley Romary <wtromary@imaoreo.io>"]
 
 [dependencies]
 rand = "0.8.5"
