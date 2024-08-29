@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+#[allow(unused_variables)]
 use core::cmp::{Ordering, Reverse};
 use rand::distributions::Uniform;
 use rand::Rng;
@@ -35,17 +37,28 @@ impl EntrencePoint {
 pub struct Graph {
     // the starting vector will be at vectors[0]
     pub nodes: Vec<NodeRef>,
+    // first node evaluated in the graph at the top layer
     pub entrence_point: EntrencePoint,
+    // number of total layers in graph
     pub layer_count: usize,
+    // the normalization factor for level generation [1/ln(M) is a good choice]
     pub m_l: f64,
+    // max number of connections per layer
     pub m_max: usize,
+    // max number of connections at layer 0
     pub m_max0: usize,
-    pub canidate_list_size: usize,
+    // number of candidates when preforming operations
+    pub candidate_list_size: usize,
+    // length of vectors
     pub dimension: usize,
 }
 
 impl Graph {
-    pub fn new(q: &[f64], m: f64, m_max: usize, m_max0: usize, canidate_list_size: usize) -> Self {
+    /*
+    q: the vector
+    m: "target number of established connections"? a reasonable range is between 5 and 48. This parameter is proportional to memory consumption
+    */
+    pub fn new(q: &[f64], m: f64, m_max: usize, m_max0: usize, candidate_list_size: usize) -> Self {
         let node = Node::new(0, 0, q);
         Graph {
             nodes: vec![node.clone()],
@@ -54,17 +67,11 @@ impl Graph {
             m_l: 1.0 / m.ln(),
             m_max: m_max,
             m_max0: m_max0,
-            canidate_list_size: canidate_list_size,
+            candidate_list_size: candidate_list_size,
             dimension: q.len(),
         }
     }
 
-    /*
-    M: target number of total connections (fudgy)
-    M_max: max number of connections per layer
-    M_max0: max number of connections at layer 0
-    M_l: normalization factor for level generation [1/ln(M) is a good choice]
-    */
     pub fn insert(&mut self, q: &[f64]) {
         let new_level = min(calc_level(self.m_l), self.layer_count);
 
@@ -108,7 +115,7 @@ impl Graph {
 
         for i in (0..=min(self.layer_count - 1, new_level)).rev() {
             // for each layer we need to fill in the neighbors of new_node
-            let nearest_nodes = search_layer(&q, ep.clone(), self.canidate_list_size, i); // hmmm
+            let nearest_nodes = search_layer(&q, ep.clone(), self.candidate_list_size, i); // hmmm
             let m = if i > 0 { self.m_max } else { self.m_max0 };
 
             let neighbors = select_neighbors_simple(&q, &nearest_nodes, m);
@@ -188,8 +195,8 @@ impl Graph {
             .iter()
             .for_each(|&x| collect.push(x));
 
-        // canidate list length
-        self.canidate_list_size
+        // candidate list length
+        self.candidate_list_size
             .to_be_bytes()
             .iter()
             .for_each(|&x| collect.push(x));
@@ -204,7 +211,7 @@ impl Graph {
         let m_l = f64::from_be_bytes(bytes[32..40].try_into().unwrap());
         let m_max = u64::from_be_bytes(bytes[40..48].try_into().unwrap());
         let m_max0 = u64::from_be_bytes(bytes[48..56].try_into().unwrap());
-        let canidate = u64::from_be_bytes(bytes[56..64].try_into().unwrap());
+        let candidate = u64::from_be_bytes(bytes[56..64].try_into().unwrap());
 
         Box::new(Graph {
             entrence_point: EntrencePoint::Index(entrence_point_index as usize),
@@ -212,10 +219,19 @@ impl Graph {
             m_l: m_l,
             m_max: m_max as usize,
             m_max0: m_max0 as usize,
-            canidate_list_size: canidate as usize,
+            candidate_list_size: candidate as usize,
             nodes: Vec::new(),
             dimension: dimension as usize,
         })
+    }
+
+    pub fn try_weaken_ep(&mut self) {
+        match &self.entrence_point {
+            EntrencePoint::Index(index) => {
+                self.entrence_point = EntrencePoint::Weak(Rc::downgrade(&self.nodes[*index]))
+            }
+            _ => (),
+        }
     }
 
     #[allow(dead_code)]
@@ -224,7 +240,7 @@ impl Graph {
         println!("m_l:\t{}", self.m_l);
         println!("m_max:\t{}", self.m_max);
         println!("m_max0:\t{}", self.m_max0);
-        println!("canidate list size:\t{}", self.canidate_list_size);
+        println!("candidate list size:\t{}", self.candidate_list_size);
         println!("dimension:\t{}", self.dimension);
 
         let ep_index = match &self.entrence_point {
@@ -266,7 +282,7 @@ impl NodePtr {
         }
     }
 
-    fn index(&self) -> Option<&usize> {
+    fn _index(&self) -> Option<&usize> {
         if let NodePtr::Index(index) = self {
             Some(index)
         } else {
@@ -274,8 +290,8 @@ impl NodePtr {
         }
     }
 
-    fn try_into_ptr(&mut self, g: &Graph) -> Option<NodePtr> {
-        let index = self.index().unwrap();
+    fn _try_into_ptr(&mut self, g: &Graph) -> Option<NodePtr> {
+        let index = self._index().unwrap();
         Some(NodePtr::Ptr(g.nodes[*index].clone()))
     }
 }
@@ -462,28 +478,28 @@ impl PartialEq for NodeHeapItem {
 impl Eq for NodeHeapItem {}
 
 pub fn knn_search(g: &Graph, q: &[f64], k: usize, ef: usize) -> Vec<NodeRef> {
-    let mut canidates = BinaryHeap::new();
+    let mut candidates = BinaryHeap::new();
     let mut entrence_point = g.entrence_point.weak().unwrap().upgrade().unwrap();
     let level = g.layer_count - 1;
 
     for l in (1..=level).rev() {
         let tmp = search_layer(q, entrence_point, 1, l)[0].clone();
-        canidates.push(Reverse(NodeHeapItem {
+        candidates.push(Reverse(NodeHeapItem {
             distance: cosine_distance(q, &tmp.clone().ptr().unwrap().borrow().vector),
             node: tmp.ptr().unwrap().clone(),
         }));
 
-        entrence_point = canidates.pop().unwrap().0.node;
+        entrence_point = candidates.pop().unwrap().0.node;
     }
 
     search_layer(q, entrence_point, ef, 0).iter().for_each(|x| {
-        canidates.push(Reverse(NodeHeapItem {
+        candidates.push(Reverse(NodeHeapItem {
             distance: cosine_distance(q, &x.ptr().unwrap().borrow().vector),
             node: x.ptr().unwrap().clone(),
         }))
     });
 
-    return canidates
+    return candidates
         .into_sorted_vec()
         .into_iter()
         .rev()
@@ -516,13 +532,13 @@ fn select_neighbors_simple(q: &[f64], c: &Vec<NodePtr>, m: usize) -> Vec<NodePtr
 fn search_layer(q: &[f64], ep: NodeRef, count: usize, layer: usize) -> Vec<NodePtr> {
     assert!(ep.borrow().max_level >= layer);
     let mut visited = Vec::new();
-    let mut canidates = BinaryHeap::new();
+    let mut candidates = BinaryHeap::new();
     let mut found = BinaryHeap::new();
 
     let init_dist = cosine_distance(q, &ep.borrow().vector);
 
     visited.push(ep.clone());
-    canidates.push(Reverse(NodeHeapItem {
+    candidates.push(Reverse(NodeHeapItem {
         distance: init_dist,
         node: ep.clone(),
     })); // top of heap is nearest to q
@@ -533,23 +549,23 @@ fn search_layer(q: &[f64], ep: NodeRef, count: usize, layer: usize) -> Vec<NodeP
     }); // top of heap is furthest from q
 
     assert!(found.len() == 1);
-    while canidates.len() > 0 {
-        let Reverse(canidate) = canidates.pop().unwrap();
+    while candidates.len() > 0 {
+        let Reverse(candidate) = candidates.pop().unwrap();
         let mut furthest = found.peek().unwrap();
 
-        if canidate.distance > furthest.distance {
+        if candidate.distance > furthest.distance {
             break;
         }
 
-        if canidate.node.borrow().friend_layers.len() > layer {
-            for e in &canidate.node.borrow().friend_layers[layer] {
+        if candidate.node.borrow().friend_layers.len() > layer {
+            for e in &candidate.node.borrow().friend_layers[layer] {
                 if !contains_rc(&visited, e.ptr().unwrap().clone()) {
                     visited.push(e.ptr().unwrap().clone());
                     furthest = found.peek().unwrap();
                     if cosine_distance(&e.ptr().unwrap().borrow().vector, q) < furthest.distance
                         || found.len() < count
                     {
-                        canidates.push(Reverse(NodeHeapItem {
+                        candidates.push(Reverse(NodeHeapItem {
                             distance: cosine_distance(q, &e.ptr().unwrap().borrow().vector),
                             node: e.ptr().unwrap().clone(),
                         }));

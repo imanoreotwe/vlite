@@ -1,7 +1,9 @@
+use log::{error, info};
+#[allow(dead_code)]
+#[allow(unused_variables)]
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use std::rc::Rc;
 
 use crate::hnsw::{Graph, Node};
 
@@ -32,30 +34,30 @@ offset  size(b) description
 
 pub struct GraphFile {
     file: File,
-    filename: String,
 }
 
 impl GraphFile {
     pub fn create(path: String) -> Self {
         GraphFile {
             file: File::create(path.clone()).unwrap(),
-            filename: path,
         }
     }
 
     pub fn open(path: String) -> Self {
         GraphFile {
             file: File::open(path.clone()).unwrap(),
-            filename: path,
         }
     }
 
     pub fn write(&mut self, g: &Graph) -> std::io::Result<()> {
         self.file.write(b"vite format 0\0")?;
         self.file.write(&*g.serialize())?;
-        g.nodes.iter().for_each(|n| {
-            self.file.write(&*n.borrow().serialize());
-        });
+        g.nodes
+            .iter()
+            .for_each(|n| match self.file.write(&*n.borrow().serialize()) {
+                Ok(_value) => info!("writing successful"),
+                Err(_value) => error!("writing failed"),
+            });
         self.file.write(b"\0\0\0\0")?;
         Ok(())
     }
@@ -74,7 +76,6 @@ impl GraphFile {
         let mut buff: Vec<[u8; 1024]> = vec![];
         let mut i = 0;
 
-        println!("node size {}", node_size);
         while node_size > 0 {
             buff.push([0; 1024]);
             handle = self
@@ -91,14 +92,11 @@ impl GraphFile {
                 handle = self.file.try_clone().unwrap().take(4);
                 handle.read(&mut size_buff)?;
                 node_size = u32::from_be_bytes(size_buff);
-                println!("node size {}", node_size);
                 i = 0;
             } else {
-                println!("reloading!");
                 i += 1;
             }
         }
-        println!("done!");
         Ok(g)
     }
 }
