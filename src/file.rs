@@ -19,7 +19,7 @@ offset  size(b) description
 54      8       m_l
 62      8       m_max
 70      8       m_max0
-78      4       canidate list size
+78      4       candidate list size
 
 
 --------------- NODE FORMAT -------------------

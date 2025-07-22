@@ -46,7 +46,7 @@ fn main() {
         let g = gf.read().unwrap();
 
         g.print();
-        interperter_loop(&g);
+        interpreter_loop(&g);
         return;
     }
 
@@ -56,8 +56,18 @@ fn main() {
         .expect("Could not read graph");
     g.try_weaken_ep();
     match args[1].as_str() {
-        "new" => {}
-        "add" => {}
+        "new" => { // needs first vector arg
+            // create blank graph
+
+            // save into file
+        }
+        "add" => { // needs vector & file arg
+            // open file
+
+            // load file into memory
+
+            // insert alg ??? -> rewrite file
+        }
         "search" => {
             info!("search selected with: vector={} k={}", args[3], args[4]);
             search_vector(&g, args[3].as_str(), args[4].as_str())
@@ -82,11 +92,13 @@ fn search_vector(g: &Graph, q_str: &str, k_str: &str) {
     }
 }
 
-fn parse_vector(string: &str) -> Vec<f64> {
-    return vec![1.0, 2.0, 3.0, 4.0];
+fn parse_vector(string: &str) -> Vec<f64> { 
+    //return vec![1.0, 2.0, 3.0, 4.0];
+    let clean_string = string.replace("[", "");
+    return clean_string.replace("]", "").split(",").collect::<Vec<&str>>().iter().map(|s| s.parse::<f64>().unwrap()).collect();
 }
 
-fn interperter_loop(g: &Graph) {
+fn interpreter_loop(g: &Graph) {
     let mut input = String::new();
     print!("> ");
     flush!();
