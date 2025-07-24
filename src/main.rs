@@ -49,6 +49,19 @@ fn main() {
         interpreter_loop(&g);
         return;
     }
+    
+    // use `./vite new <filename> <vector>`
+    if args[1].as_str() == "new" {
+        // parse first vector
+        let vec_str = std::env::args().nth(3).expect("Error: you must provide an initial vector;");
+        let init_vec = parse_vector(&vec_str);
+        // create graph
+        let g = Graph::new(&init_vec, 5.0, 5, 10, 20);
+        // save into file
+        GraphFile::create(args[2].clone().into()).write(&g).unwrap();
+        return;
+    }
+
 
     // vite <command> <filename>
     let mut g = GraphFile::open(args[2].clone().into())
@@ -56,21 +69,18 @@ fn main() {
         .expect("Could not read graph");
     g.try_weaken_ep();
     match args[1].as_str() {
-        "new" => { // needs first vector arg
-            // create blank graph
-
-            // save into file
-        }
-        "add" => { // needs vector & file arg
+        // usage `./vite add <filename> <vector>`
+        "add" => {
             // open file
 
             // load file into memory
 
             // insert alg ??? -> rewrite file
         }
+        // usage `./vite search <filename> <vector>`
         "search" => {
             info!("search selected with: vector={} k={}", args[3], args[4]);
-            search_vector(&g, args[3].as_str(), args[4].as_str())
+            search_vector(&g, &parse_vector(args[3].as_str()), args[4].as_str())
         }
         _ => error!("invalid command"),
     }
@@ -82,8 +92,7 @@ fn new_graph_wizard() -> Graph {
 }
 */
 
-fn search_vector(g: &Graph, q_str: &str, k_str: &str) {
-    let q = parse_vector(q_str);
+fn search_vector(g: &Graph, q: &Vec<f64>, k_str: &str) {
     let k = u64::from_str_radix(k_str, 10).unwrap();
     let search = knn_search(&g, &q, k.try_into().unwrap(), 20);
 
