@@ -77,7 +77,7 @@ fn main() {
 
             // insert alg ??? -> rewrite file
         }
-        // usage `./vite search <filename> <vector>`
+        // usage `./vite search <filename> <vector> <k>`
         "search" => {
             info!("search selected with: vector={} k={}", args[3], args[4]);
             search_vector(&g, &parse_vector(args[3].as_str()), args[4].as_str())
@@ -97,8 +97,9 @@ fn search_vector(g: &Graph, q: &Vec<f64>, k_str: &str) {
     let search = knn_search(&g, &q, k.try_into().unwrap(), 20);
 
     for elem in search {
-        print!("{}, ", elem.borrow().index)
+        print!("{}, ", elem.borrow().index);
     }
+    print!("\n");
 }
 
 fn parse_vector(string: &str) -> Vec<f64> { 

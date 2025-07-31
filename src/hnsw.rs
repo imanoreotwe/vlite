@@ -93,8 +93,7 @@ impl Graph {
         }
 
         for _i in 0..new_level {
-            let mut new_node = self.nodes.last().unwrap().borrow_mut();
-            new_node.friend_layers.push(Vec::new());
+            self.nodes.last().unwrap().borrow_mut().friend_layers.push(Vec::new());
         }
 
         let mut ep = self
